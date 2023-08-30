@@ -1,3 +1,5 @@
+//! Interval expression
+
 use std::{
     fmt::{Display, Write},
     str::FromStr,
@@ -12,9 +14,12 @@ use rand::{
 use crate::regex;
 use crate::Pcg;
 
+/// Int type used in the interval
 pub type Int = i32;
+/// Float type used in the interval
 pub type Float = f32;
 
+/// Description of an interval
 #[derive(Debug, Clone, PartialEq)]
 pub struct Interval {
     low_inc: bool,
@@ -23,11 +28,12 @@ pub struct Interval {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub enum IntervalKind {
+enum IntervalKind {
     Int(std::ops::Range<Int>),
     Float(std::ops::Range<Float>),
 }
 
+/// Error from [`Interval::from_str`]
 #[derive(Debug, thiserror::Error)]
 pub enum IntervalParseError {
     #[error("The input is not an interval")]
@@ -171,12 +177,19 @@ impl Display for Interval {
     }
 }
 
+/// Sample from an interval
+///
+/// The [`Display`] [alternate modifier](std::fmt#sign0) will only print
+/// the sampled value.
 #[derive(Debug, Clone, PartialEq)]
 pub struct IntervalResult {
-    interval: Interval,
-    value: Num,
+    /// Original interval
+    pub interval: Interval,
+    /// Value obtained
+    pub value: Num,
 }
 
+/// Either an [`Int`] or a [`Float`].
 #[derive(Debug, Clone, PartialEq)]
 pub enum Num {
     Int(Int),

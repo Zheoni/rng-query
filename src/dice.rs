@@ -1,3 +1,5 @@
+//! Dice expression
+
 use owo_colors::OwoColorize;
 use rand::Rng;
 
@@ -5,12 +7,16 @@ use crate::regex;
 use crate::Pcg;
 use std::{fmt::Display, str::FromStr};
 
+/// A description of a dice roll
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Roll {
-    amount: u16,
-    sides: u16,
+    /// Number of dice
+    pub amount: u16,
+    /// Number of sides
+    pub sides: u16,
 }
 
+/// Error from [`Roll::from_str`]
 #[derive(Debug, thiserror::Error)]
 pub enum RollParseError {
     #[error("The input is not a dice roll")]
@@ -79,9 +85,14 @@ impl Display for Roll {
     }
 }
 
+/// Result of a [`Roll`] evaluation
+///
+/// The [`Display`] [alternate modifier](std::fmt#sign0) will only print
+/// [`RollResult::total`].
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RollResult {
-    roll: Roll,
+    /// Original roll description
+    pub roll: Roll,
     dice: Vec<u16>,
     total: u32,
 }
@@ -96,6 +107,18 @@ impl Roll {
             total: dice.iter().map(|&v| v as u32).sum(),
             dice,
         }
+    }
+}
+
+impl RollResult {
+    /// Results obtained
+    pub fn dice(&self) -> &[u16] {
+        &self.dice
+    }
+
+    /// Total value
+    pub fn total(&self) -> u32 {
+        self.total
     }
 }
 

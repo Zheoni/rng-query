@@ -1,3 +1,5 @@
+//! Coin expression
+
 use std::fmt::Display;
 
 use owo_colors::OwoColorize;
@@ -5,13 +7,14 @@ use rand::Rng;
 
 use crate::Pcg;
 
-pub fn toss_coin(rng: &mut Pcg) -> CoinResult {
+pub(crate) fn toss_coin(rng: &mut Pcg) -> CoinResult {
     match rng.gen::<bool>() {
         true => CoinResult::Heads,
         false => CoinResult::Tails,
     }
 }
 
+/// Result of tossing a coin
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CoinResult {
     Heads,

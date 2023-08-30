@@ -32,11 +32,20 @@ impl BufferedEntry {
     }
 }
 
+/// Entry result
+///
+/// The display impl is transparent. And the [`Display`] [alternate
+/// modifier](std::fmt#sign0) will only print the result and not the expression
+/// itself.
 #[derive(Debug, Clone, PartialEq)]
 pub enum Entry {
+    /// Just text
     Text(Rc<str>),
+    /// A coin flip
     Coin(CoinResult),
+    /// A dice roll
     Dice(RollResult),
+    /// An interval sample
     Interval(IntervalResult),
 }
 
