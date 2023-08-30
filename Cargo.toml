@@ -1,9 +1,15 @@
 [package]
 name = "rng-query"
+description = "CLI to use pseudorandomness the easy way"
 version = "0.1.0"
 edition = "2021"
 authors = ["Zheoni <zheoni@outlook.es>"]
 license = "MIT"
+keywords = ["cli", "rng", "dice"]
+categories = ["command-line-utilities"]
+repository = "https://github.com/Zheoni/rng-query"
+readme = "README.md"
+
 
 [dependencies]
 rand = "0.8.5"
