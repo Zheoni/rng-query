@@ -1,0 +1,31 @@
+[package]
+name = "rng-query"
+version = "0.1.0"
+edition = "2021"
+authors = ["Zheoni <zheoni@outlook.es>"]
+license = "MIT"
+
+[dependencies]
+rand = "0.8.5"
+rand_pcg = "0.3.1"
+regex = "1.9.4"
+thiserror = "1.0.47"
+owo-colors = "3.5.0"
+# bin
+rustyline = { version = "12.0.0", default_features = false, optional = true }
+clap = { version = "4.4.1", features = ["derive"], optional = true }
+anyhow = { version = "1.0.75", optional = true }
+anstream = { version = "0.5.0", optional = true }
+colorchoice-clap = { version = "1.0.2", optional = true }
+
+[dev-dependencies]
+test-case = "3.1.0"
+
+[features]
+default = ["bin"]
+bin = ["dep:rustyline", "dep:clap", "dep:anyhow", "dep:anstream", "dep:colorchoice-clap"]
+
+[[bin]]
+name = "rq"
+path = "src/bin/rq.rs"
+required-features = ["bin"]
