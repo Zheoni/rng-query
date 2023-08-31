@@ -19,8 +19,10 @@ use std::fmt::Display;
 use std::rc::Rc;
 use std::str::FromStr;
 
+use entry::split_entries;
 use entry::BufferedEntry;
 use entry::EntryData;
+use entry::SplitEntriesError;
 use rand::seq::SliceRandom;
 use rand::SeedableRng;
 use rand_pcg::Pcg64 as Pcg;
@@ -257,7 +259,8 @@ impl State {
             Some((entries, options)) => (entries, Some(options)),
             None => (stmt, None),
         };
-        for entry in entries.split(self.separators.entry) {
+        for entry in split_entries(entries, self.separators.entry) {
+            let entry = entry?;
             self.add_entry(entry);
         }
         if let Some(options) = options {
@@ -323,7 +326,7 @@ fn select(
         Amount::N(n) => n as usize,
     };
 
-    let parse = |entry: &BufferedEntry| {
+    let parse = |entry: &BufferedEntry| -> Result<BufferedEntry, Error> {
         if eval_expr {
             if let EntryData::Text(t) = &entry.data {
                 let data = entry::parse_expr(t)?;
@@ -399,9 +402,11 @@ impl Display for StmtOutput {
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
     /// Parsing options
-    #[error("Options error: {0}")]
+    #[error("options: {0}")]
     Options(String),
     /// Parsing expressions
-    #[error("Expression error: {0}")]
+    #[error("expression: {0}")]
     Expr(String),
+    #[error("inline entries: {0}")]
+    SplitError(#[from] SplitEntriesError),
 }

@@ -36,9 +36,9 @@ enum IntervalKind {
 /// Error from [`Interval::from_str`]
 #[derive(Debug, thiserror::Error)]
 pub enum IntervalParseError {
-    #[error("The input is not an interval")]
+    #[error("the input is not an interval")]
     NoMatch,
-    #[error("Invalid interval: {0}")]
+    #[error("invalid interval: {0}")]
     Invalid(String),
 }
 

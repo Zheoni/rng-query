@@ -35,6 +35,15 @@ Each query works like a stack where you push entries separated by `\n` or `,`.
 Then, everything AFTER `/`, UNTIL `\n` or `;` are options. If no `/` is given,
 default options are used, which will just select one random entry.
 
+In a single line, inside balanced `[]`, `{}` or `()`, the `,` separating entries
+is ignored. Also, `[]` and `()` balance together, so `[)` and `(]` are
+balanced.[^1] If it's not balanced, it's an error.[^2] If you want to use some
+of those chars as text, put them between `"` and it will be a string.
+
+[^1]: This may be triggering to some people, I'm sorry, but I like the interval
+    syntax.
+[^2]: For input from a file, this can be bypassed.
+
 Entries can be expressions, however, by default, if there are more than 1 entry,
 then entries are treated as text, not expressions.
 
@@ -54,11 +63,11 @@ count.
 - `o`: keep the order when choosing multip.le
 
 There are some shorthands:
-- `/ shuffle` same as `/ all`[^1]
+- `/ shuffle` same as `/ all`[^3]
 - `/ list` same as `/ all Eo`
 - `/ eval` same as `/ all eo`
 
-[^1]: Ok, this is actually longer, but it expresses the intention better.
+[^3]: Ok, this is actually longer, but it expresses the intention better.
 
 ### Choose number from an interval
 ```

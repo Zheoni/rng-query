@@ -6,6 +6,7 @@ use std::{
 
 use anyhow::{Context, Result};
 use clap::Parser;
+use owo_colors::OwoColorize;
 use rng_query::State;
 
 /// CLI to use pseudorandomness the easy way
@@ -169,17 +170,29 @@ pub fn main() -> Result<()> {
 }
 
 fn repl(state: &mut State) -> Result<()> {
+    macro_rules! clear_error {
+        ($result:expr) => {
+            match $result {
+                Ok(val) => val,
+                Err(e) => {
+                    anstream::println!("{}: {e}", "Error".red().bold());
+                    continue;
+                }
+            }
+        };
+    }
+
     let mut rl = rustyline::DefaultEditor::new()?;
     while let Ok(line) = rl.readline(">> ") {
         let _ = rl.add_history_entry(line.as_str());
-        let mut out = state.run_line(&line)?;
+        let mut out = clear_error!(state.run_line(&line));
         if !line.ends_with('\\') {
-            if let Some(tail_out) = state.eof()? {
+            if let Some(tail_out) = clear_error!(state.eof()) {
                 out.push(tail_out);
             }
         }
         for stmt in out {
-            anstream::println!("{stmt}");
+            anstream::print!("{stmt}");
         }
     }
     Ok(())

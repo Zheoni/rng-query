@@ -19,9 +19,9 @@ pub struct Roll {
 /// Error from [`Roll::from_str`]
 #[derive(Debug, thiserror::Error)]
 pub enum RollParseError {
-    #[error("The input is not a dice roll")]
+    #[error("the input is not a dice roll")]
     NoMatch,
-    #[error("Invalid dice roll: {0}")]
+    #[error("invalid dice roll: {0}")]
     Invalid(String),
 }
 
