@@ -29,7 +29,7 @@ impl FromStr for Roll {
     type Err = RollParseError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let re = regex!(r"(\d+)?d(\d+|%)");
+        let re = regex!(r"\A(\d+)?d(\d+|%)\z");
 
         let caps = re.captures(s).ok_or(RollParseError::NoMatch)?;
 
