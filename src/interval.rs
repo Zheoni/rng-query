@@ -94,16 +94,16 @@ fn build_int_range(
 
 fn parse_interval(s: &str) -> Result<Interval, IntervalParseError> {
     let re = regex!(
-        r"\A([\[\(])\s*((?:\+|-)?(?:\d*\.)?\d+)\s*\.{2}\s*((?:\+|-)?\d+(?:\.\d*)?)\s*([\]\)])(f|F)?\z"
+        r"\A([\[\(])\s*((?:\+|-)?(?:\d*\.)?\d+)\s*(,|\.{2})\s*((?:\+|-)?(?:\d*\.)?\d+)\s*([\]\)])\z"
     );
 
     let caps = re.captures(s).ok_or(IntervalParseError::NoMatch)?;
 
     let low_inc = &caps[1] == "[";
-    let high_inc = &caps[4] == "]";
+    let high_inc = &caps[5] == "]";
     let start = &caps[2];
-    let end = &caps[3];
-    let is_float = caps.get(5).is_some() || start.contains('.') || end.contains('.');
+    let end = &caps[4];
+    let is_float = &caps[3] == "," || start.contains('.') || end.contains('.');
 
     let kind = if is_float {
         let start = parse_float(start, START)?;
@@ -255,10 +255,10 @@ mod tests {
     use test_case::test_case;
 
     #[test_case("[1..10]" => 1..11 ; "inclusive")]
-    #[test_case("[1..10)" => 1..10 ; "end open")]
-    #[test_case("(1..10]" => 2..11 ; "start open")]
-    #[test_case("(1..10)" => 2..10 ; "open")]
-    #[test_case("1..10" => 1..10 ; "alt open")]
+    #[test_case("[1..10)" => 1..10 ; "end exclusive")]
+    #[test_case("(1..10]" => 2..11 ; "start exclusive")]
+    #[test_case("(1..10)" => 2..10 ; "exclusive")]
+    #[test_case("1..10" => 1..10 ; "alt exclusive")]
     #[test_case("1..=10" => 1..11 ; "alt inclusive")]
     #[test_case("[-5..-3)" => -5..-3 ; "neg")]
     #[test_case("[-5..-3]" => -5..-2 ; "neg inclusive")]
@@ -272,16 +272,22 @@ mod tests {
         }
     }
 
-    #[test_case("[1..10]f" => (1.0..10.0, true, true) ; "inclusive")]
-    #[test_case("[1..10)f" => (1.0..10.0, true, false) ; "end open")]
-    #[test_case("(1..10]f" => (1.0..10.0, false, true) ; "start open")]
-    #[test_case("(1..10)f" => (1.0..10.0, false, false) ; "open")]
-    #[test_case("(1.0..10.0)" => (1.0..10.0, false, false) ; "full decimal")]
-    #[test_case("(1.0..10)" => (1.0..10.0, false, false) ; "only first decimal")]
-    #[test_case("(1..10.0)" => (1.0..10.0, false, false) ; "only second decimal")]
-    #[test_case("(1...10.)" => panics "failed to parse" ; "bad partial decimal start")]
-    #[test_case("(1...9)" => panics "failed to parse" ; "bad partial decimal end")]
-    #[test_case("(.5..10.)" => (0.5..10.0, false, false) ; "partial decimal")]
+    #[test_case("[1,10]" => (1.0..10.0, true, true) ; "inclusive")]
+    #[test_case("[1,10)" => (1.0..10.0, true, false) ; "end exclusive")]
+    #[test_case("(1,10]" => (1.0..10.0, false, true) ; "start exclusive")]
+    #[test_case("(1,10)" => (1.0..10.0, false, false) ; "exclusive")]
+    #[test_case("(1.0,10.0)" => (1.0..10.0, false, false) ; "full decimal")]
+    #[test_case("(1.0,10)" => (1.0..10.0, false, false) ; "only first decimal")]
+    #[test_case("(1,10.0)" => (1.0..10.0, false, false) ; "only second decimal")]
+    #[test_case("(1.,10)" => panics "failed to parse" ; "bad partial decimal start")] // no float with trailing .
+    #[test_case("(0,.9)" => (0.0..0.9, false, false) ; "bad partial decimal end")]
+    #[test_case("(1.0,10.0)" => (1.0..10.0, false, false) ; "partial decimal")]
+    #[test_case("(1.0..10.0)" => (1.0..10.0, false, false) ; "decimal on int")]
+    #[test_case("(.5..1)" => (0.5..1.0, false, false) ; "one decimal on int")]
+    #[test_case("(1..10)" => panics "not float" ; "int")]
+    #[test_case("(-1, 1)" => (-1.0..1.0, false, false) ; "neg start")]
+    #[test_case("(2, -1)" => panics "failed to parse" ; "neg end")] // start > end
+    #[test_case("(-2, -1)" => (-2.0..-1.0, false, false) ; "neg")]
     fn parse_float(s: &str) -> (std::ops::Range<Float>, bool, bool) {
         let interval = s.parse::<Interval>().expect("failed to parse");
         match interval.kind {

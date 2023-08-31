@@ -75,15 +75,15 @@ There are some shorthands:
 [1..4)   # 1 to 4 NOT including 4
 (1..4]   # 1 to 4 NOT including 1
 (1..4)   # 1 to 4 NOT including 1 nor 4
-(0..1)f  # 0 to 1 float
-(0..1.)  # 0 to 1 float
-(0.5..1) # 0.5 to 1 float
+(0, 1)   # 0 to 1 float
+(0, 1)   # 0 to 1 float
+(0..1.0) # 0 to 1 float
+(.5, 1)  # 0.5 to 1 float
 ```
-`[` and `]` to include endpoint, `(` and `)` to exclude endpoint. If any of the
-numbers is a float or there's an `f` or `F` after the closing char, the interval
-will produce floating point values. A float can be `1.5`, `1.` or `.5`, but no 3
-dots can be together in the interval, so `1.` can't be the start and `.5` can't
-be the end.
+`[` and `]` to include endpoint, `(` and `)` to exclude endpoint. If the middle
+is `,`, values are floats. If the middle is `..` the values are int by default
+except if any of them is a float. A float can be of the form `1.5`, `1.` or
+`.5`.
 
 Also `[start]..[end]` or `[start]..=[end]` to include end number is an
 alternative notation only for intergers.
