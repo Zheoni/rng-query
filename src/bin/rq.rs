@@ -92,9 +92,9 @@ pub fn main() -> Result<()> {
     } else {
         State::new()
     };
-    state.separators.stmt = args.stmt_sep;
-    state.separators.entry = args.entry_sep;
-    state.separators.options = args.options_sep;
+    state.sep.stmt = args.stmt_sep;
+    state.sep.entry = args.entry_sep;
+    state.sep.options = args.options_sep;
 
     let mut output = Vec::new();
 

@@ -13,16 +13,16 @@ pub mod coin;
 pub mod dice;
 mod entry;
 pub mod interval;
+mod parse;
 
 use std::collections::HashMap;
 use std::fmt::Display;
 use std::rc::Rc;
 use std::str::FromStr;
 
-use entry::split_entries;
 use entry::BufferedEntry;
 use entry::EntryData;
-use entry::SplitEntriesError;
+use parse::{split_line_parts, QueryPart, SplitPartsError};
 use rand::seq::SliceRandom;
 use rand::SeedableRng;
 use rand_pcg::Pcg64 as Pcg;
@@ -69,7 +69,7 @@ pub fn run(input: &str) -> Result<Vec<StmtOutput>, Error> {
 /// To use this, change the [`separators`](State::separators) field in [`State`].
 ///
 /// Be careful, it can break expression parsing.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Separators {
     pub stmt: char,
     pub entry: char,
@@ -204,7 +204,7 @@ pub struct State {
     rng: Pcg,
     entry_counter: usize,
     /// See [`Separators`]
-    pub separators: Separators,
+    pub sep: Separators,
 }
 
 impl State {
@@ -223,7 +223,7 @@ impl State {
             stack: Vec::new(),
             rng,
             entry_counter: 0,
-            separators: Separators::default(),
+            sep: Separators::default(),
         }
     }
 }
@@ -241,33 +241,32 @@ impl State {
     ///
     /// The input should *NOT* include `\n`.
     pub fn run_line(&mut self, line: &str) -> Result<Vec<StmtOutput>, Error> {
-        let sep = self.separators.stmt;
         let mut outputs = Vec::new();
-        for part in line.split_inclusive(sep) {
-            let options = self.run_stmt_part(part.trim_end_matches(sep))?;
-            let is_end = options.is_some() || part.ends_with(sep);
-            if is_end {
-                let output = self.end_stmt(options.unwrap_or_default())?;
-                outputs.push(output);
+
+        let mut options = None;
+
+        for part in split_line_parts(line, self.sep) {
+            let part = part?;
+            match part {
+                QueryPart::Entry(e) => self.add_entry(e),
+                QueryPart::Options(o) => {
+                    assert!(options.is_none(), "more than one options in a query");
+                    options = Some(o.parse()?);
+                }
+                QueryPart::EndStmt => {
+                    let output = self.end_stmt(options.unwrap_or_default())?;
+                    outputs.push(output);
+                    options = None;
+                }
             }
         }
-        Ok(outputs)
-    }
 
-    fn run_stmt_part(&mut self, stmt: &str) -> Result<Option<Options>, Error> {
-        let (entries, options) = match stmt.split_once(self.separators.options) {
-            Some((entries, options)) => (entries, Some(options)),
-            None => (stmt, None),
-        };
-        for entry in split_entries(entries, self.separators.entry) {
-            let entry = entry?;
-            self.add_entry(entry);
-        }
         if let Some(options) = options {
-            options.trim().parse::<Options>().map(Some)
-        } else {
-            Ok(None)
+            let output = self.end_stmt(options)?;
+            outputs.push(output);
         }
+
+        Ok(outputs)
     }
 
     /// Add an entry, without parsing it
@@ -408,5 +407,5 @@ pub enum Error {
     #[error("expression: {0}")]
     Expr(String),
     #[error("inline entries: {0}")]
-    SplitError(#[from] SplitEntriesError),
+    SplitError(#[from] SplitPartsError),
 }
