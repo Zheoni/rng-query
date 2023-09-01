@@ -22,8 +22,8 @@ rq                # will get you into a REPL
 rq --help         # see all options
 ```
 
-With the CLI you can read from `stdin`, files, treat files as only
-data and combine it with a command.
+With the CLI you can read from `stdin`, files, treat files as only data and
+combine it with an inline query.
 
 For example, choose 2 lines from a file keeping the input order:
 ```
@@ -31,14 +31,15 @@ rq -F input.txt "/ 2o"
 ```
 
 ## Syntax
-Each query works like a stack where you push entries separated by `\n` or `,`.
-Then, everything AFTER `/`, UNTIL `\n` or `;` are options. If no `/` is given,
-default options are used, which will just select one random entry.
+Each query works like a stack where you push entries separated by `,` or a
+newline. Then, everything AFTER `/`, UNTIL `;` or the end of the line are
+options. If no `/` is given, default options are used, which will just select
+one random entry.
 
-In a single line, inside balanced `[]`, `{}` or `()`, the `,` separating entries
-is ignored. Also, `[]` and `()` balance together, so `[)` and `(]` are
-balanced.[^1] If it's not balanced, it's an error.[^2] If you want to use some
-of those chars as text, put them between `"` and it will be a string.
+In a single line, inside balanced `[]`, `{}` or `()`, input is escaped so `,`,
+`/` and `;` can be used freely. Also, `[]` and `()` balance together, so `[)`
+and `(]` are balanced.[^1] If it's not balanced, it's an error.[^2] Finally, you
+can also wrap anything between `"` to treat it as a string.
 
 [^1]: This may be triggering to some people, I'm sorry, but I like the interval
     syntax.
@@ -53,17 +54,18 @@ future queries.
 ### Options
 If the input ends without options, `/ 1` is the default.
 
-The options have the format `/ <n> [flags]`, where flags are just chars. Spaces
-are ignored. `<n>` is a non negative integer or `all`, so you don't have to
-count.
+The options have the format `/ [n] [flags]`, where flags are just chars. Spaces
+are ignored. `[n]` is a non negative integer or `all`, so you don't have to
+count. If not given, it's 1.
 - `r`: repeating. Allow options to repeat.
 - `e`: **(default if only 1 entry)** each entry is a expression like an
   interval, coin or a dice roll.
 - `E`: **(default if more than 1 entry)** each entry is just text.
-- `o`: keep the order when choosing multip.le
+- `o`: keep the order when choosing multiple.
+- `p`: push the selected entries back to the stack instead of returning them.
 
 There are some shorthands:
-- `/ shuffle` same as `/ all`[^3]
+- `/ shuffle` same as `/ all E`[^3]
 - `/ list` same as `/ all Eo`
 - `/ eval` same as `/ all eo`
 
@@ -85,7 +87,7 @@ is `,`, values are floats. If the middle is `..` the values are int by default
 except if any of them is a float. A float can be of the form `1.5`, `1.` or
 `.5`.
 
-Also `[start]..[end]` or `[start]..=[end]` to include end number is an
+Also `<start>..<end>` or `<start>..=<end>` to include end number is an
 alternative notation only for intergers.
 ```
 1..=4  # 1 to 4 including both
@@ -101,18 +103,26 @@ handle max/min values.
 ```
 coin
 ```
-When evaluated you will get `heads` or `tails`
+When evaluated you will get `heads` or `tails`.
 
 ### Roll dice
 ```
-<amount>d[sides]
+[amount]d<sides>[keep/drop]
+
+d6        => roll a 6 sided die
+2d6       => 2 x 6s dice and sum
+2d20k     => 2 x 20s dice and keep the highest
 ```
 
 Sides can also be `%` which equals to `100`.
 
 When evaluated you will get the sum of all the dice rolls.
 
+There are many possible modifiers for this dice notation, but please don't use
+this tool for your D&D game, roll real dice! If you really *really* **really**
+think modifiers can be useful, submit an issue.
+
 ## Notes on pseudorandomness
 
 Currently, randomness should be statistically valid, but NOT cryptographically
-securesecure. If you need this to change, submit an issue.
+secure. If you need this to change, submit an issue.

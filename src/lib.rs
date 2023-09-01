@@ -92,6 +92,7 @@ struct Options {
     repeating: bool,
     eval_expr: EvalExpr,
     keep_order: bool,
+    push: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -113,6 +114,7 @@ impl Default for Options {
             repeating: false,
             eval_expr: EvalExpr::Auto,
             keep_order: false,
+            push: false,
         }
     }
 }
@@ -124,21 +126,20 @@ impl FromStr for Options {
         let preset = match s {
             "shuffle" => Some(Options {
                 amount: Amount::All,
-                repeating: false,
                 eval_expr: EvalExpr::Custom(false),
-                keep_order: false,
+                ..Default::default()
             }),
             "list" => Some(Options {
                 amount: Amount::All,
-                repeating: false,
                 eval_expr: EvalExpr::Custom(false),
                 keep_order: true,
+                ..Default::default()
             }),
             "eval" => Some(Options {
                 amount: Amount::All,
-                repeating: false,
                 eval_expr: EvalExpr::Custom(true),
                 keep_order: true,
+                ..Default::default()
             }),
             _ => None,
         };
@@ -146,16 +147,17 @@ impl FromStr for Options {
             return Ok(preset);
         }
 
-        let re = regex!(r"\A(all\s|0|(?:[1-9][0-9]*))\s*([\sreEo]*)\z");
+        let re = regex!(r"\A(all\s|0|(?:[1-9][0-9]*))?\s*([\sreEop]*)\z");
         let cap = re
             .captures(s)
             .ok_or_else(|| Error::Options(format!("Bad options: {s}")))?;
-        let amount = match cap[1].trim_end() {
-            "all" => Amount::All,
-            n => n
+        let amount = match cap.get(1).map(|m| m.as_str().trim_end()) {
+            Some("all") => Amount::All,
+            Some(n) => n
                 .parse::<u32>()
                 .map(Amount::N)
                 .map_err(|e| Error::Options(format!("Bad amount: {e}")))?,
+            None => Amount::N(1),
         };
 
         let mut flags = cap[2]
@@ -174,6 +176,7 @@ impl FromStr for Options {
         }
         let repeating = flags.contains(&'r');
         let keep_order = flags.contains(&'o');
+        let push = flags.contains(&'p');
 
         let eval_expr = flags.contains(&'e');
         let not_eval_expr = flags.contains(&'E');
@@ -193,6 +196,7 @@ impl FromStr for Options {
             repeating,
             eval_expr,
             keep_order,
+            push,
         })
     }
 }
@@ -306,6 +310,14 @@ impl State {
             .collect();
 
         self.stack.clear();
+
+        if options.push {
+            for val in &output {
+                self.add_entry(&format!("{val:#}"));
+            }
+            return Ok(StmtOutput(vec![]));
+        }
+
         Ok(StmtOutput(output))
     }
 }
