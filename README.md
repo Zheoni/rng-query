@@ -36,7 +36,7 @@ newline. Then, everything AFTER `/`, UNTIL `;` or the end of the line are
 options. If no `/` is given, default options are used, which will just select
 one random entry.
 
-In a single line, inside balanced `[]`, `{}` or `()`, input is escaped so `,`,
+In a single line, inside balanced `[]`, `()` or `{}`, input is escaped so `,`,
 `/` and `;` can be used freely. Also, `[]` and `()` balance together, so `[)`
 and `(]` are balanced.[^1] If it's not balanced, it's an error.[^2] Finally, you
 can also wrap anything between `"` to treat it as a string.
@@ -78,9 +78,8 @@ There are some shorthands:
 (1..4]   # 1 to 4 NOT including 1
 (1..4)   # 1 to 4 NOT including 1 nor 4
 (0, 1)   # 0 to 1 float
-(0, 1)   # 0 to 1 float
 (0..1.0) # 0 to 1 float
-(.5, 1)  # 0.5 to 1 float
+(.5, 1]  # 0.5 to 1 float including 1
 ```
 `[` and `]` to include endpoint, `(` and `)` to exclude endpoint. If the middle
 is `,`, values are floats. If the middle is `..` the values are int by default
@@ -107,7 +106,7 @@ When evaluated you will get `heads` or `tails`.
 
 ### Roll dice
 ```
-[amount]d<sides>[keep/drop]
+[amount]d<sides>[!][select][modifier*]
 
 d6        => roll a 6 sided die
 2d6       => 2 x 6s dice and sum
@@ -116,11 +115,24 @@ d6        => roll a 6 sided die
 
 Sides can also be `%` which equals to `100`.
 
+`!` is exploding. If rolled the maximum value, roll another die.
+
+For select you can add `<k|d>[h|l][n]`. You can have.
+- `k` or `kh` to keep the highest `n` dice.
+- `kl` to keep the lowest `n` dice.
+- `d` or `dl` to drop the lowest `n` dice.
+- `dh` to drop the `n` highest dice.
+
+If `n` is not given, it's 1.
+
+The modifer is `<+|->[m]` to add or subtract a value to the total result. You
+can specify more than one.
+
 When evaluated you will get the sum of all the dice rolls.
 
-There are many possible modifiers for this dice notation, but please don't use
-this tool for your D&D game, roll real dice! If you really *really* **really**
-think modifiers can be useful, submit an issue.
+There are many more ways to expand this dice notation, but please don't use this
+tool for your D&D game, roll real dice! If you really *really* **really** think
+more modifiers can be useful, submit an issue.
 
 ## Notes on pseudorandomness
 

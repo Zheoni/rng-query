@@ -61,12 +61,12 @@ pub fn run(input: &str) -> Result<Vec<StmtOutput>, Error> {
 /// ```
 /// use rng_query::Separators;
 /// let sep = Separators::default();
-/// assert_eq!(sep.stmt, ';'); // And `\n` always.
-/// assert_eq!(sep.entry, ',');
+/// assert_eq!(sep.stmt, ';');
+/// assert_eq!(sep.entry, ','); // And `\n` always.
 /// assert_eq!(sep.options, '/');
 /// ```
 ///
-/// To use this, change the [`separators`](State::separators) field in [`State`].
+/// To use this, change the [`separators`](State::sep) field in [`State`].
 ///
 /// Be careful, it can break expression parsing.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -243,7 +243,8 @@ impl State {
     ///
     /// The line will be parsed, to add data, use [`State::add_entry`].
     ///
-    /// The input should *NOT* include `\n`.
+    /// # Panics
+    /// (only in debug) if the input contains `\n`.
     pub fn run_line(&mut self, line: &str) -> Result<Vec<StmtOutput>, Error> {
         let mut outputs = Vec::new();
 
