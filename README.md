@@ -12,8 +12,8 @@
 "a, b, c / shuffle"       => shuffle the list
 "2d20"                    => roll 2 20 sided dice and sum the result
 "[1..10]" or "1..=10"     => random number between 1 and 10, including both
-"[1..10)" or "1..10"      => number between 1 and 10 NOT including 1
-"(1..5.5]"                => decimal number between 1 and 5.5 not including 5.5
+"[1..10)" or "1..10"      => number between 1 and 10 NOT including 10
+"(1, 5.5]"                => decimal number between 1 and 5.5 not including 1
 "coin"                    => toss a coin
 "a, coin, d6, -5..5 / 2e" => 2 values from the list and evaluate the result
 ```
