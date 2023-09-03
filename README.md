@@ -8,7 +8,7 @@
 "[1..10)" or "1..10"      => number between 1 and 10 NOT including 1
 "(1..5.5]"                => decimal number between 1 and 5.5 not including 5.5
 "coin"                    => toss a coin
-"a, coin, d6, -5..5 / 2e" => choose 2 values from the list and evaluate the result
+"a, coin, d6, -5..5 / 2e" => 2 values from the list and evaluate the result
 ```
 
 ## CLI
@@ -69,11 +69,9 @@ count. If not given, it's 1.
 - `p`: push the selected entries back to the stack instead of returning them.
 
 There are some shorthands:
-- `/ shuffle` same as `/ all E`[^3]
+- `/ shuffle` same as `/ all E`
 - `/ list` same as `/ all Eo`
 - `/ eval` same as `/ all eo`
-
-[^3]: Ok, this is actually longer, but it expresses the intention better.
 
 ### Choose number from an interval
 ```

@@ -3,7 +3,7 @@ use std::{fmt::Display, rc::Rc};
 use crate::{
     coin::{self, CoinResult},
     dice::{Roll, RollParseError, RollResult},
-    interval::{Interval, IntervalParseError, IntervalResult},
+    interval::{Interval, IntervalParseError, IntervalSample},
     Error, Pcg,
 };
 
@@ -103,7 +103,7 @@ pub enum Entry {
     /// A dice roll
     Dice(RollResult),
     /// An interval sample
-    Interval(IntervalResult),
+    Interval(IntervalSample),
 }
 
 impl Entry {

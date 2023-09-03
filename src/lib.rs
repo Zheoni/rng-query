@@ -28,7 +28,7 @@ use rand_pcg::Pcg64 as Pcg;
 pub use coin::CoinResult;
 pub use dice::RollResult;
 pub use entry::Entry;
-pub use interval::IntervalResult;
+pub use interval::{Float, Int, IntervalSample, Num};
 
 macro_rules! regex {
     ($re:literal $(,)?) => {{
@@ -280,6 +280,9 @@ impl State {
     }
 
     /// Signal the interpreter the end of the input
+    ///
+    /// This can also be used to force an statement end without getting an
+    /// [`Separators::stmt`].
     pub fn eof(&mut self) -> Result<Option<StmtOutput>, Error> {
         if self.stack.is_empty() {
             Ok(None)

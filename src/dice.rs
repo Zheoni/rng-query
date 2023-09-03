@@ -187,21 +187,20 @@ impl Display for Roll {
     }
 }
 
-/// Result of a [`Roll`] evaluation
+/// Result of a dice roll evaluation
 ///
 /// The [`Display`] [alternate modifier](std::fmt#sign0) will only print
 /// [`RollResult::total`].
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RollResult {
-    /// Original roll description
     roll: Roll,
     dice: Vec<Die>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-pub struct Die {
-    pub val: u16,
-    pub drop: bool,
+struct Die {
+    val: u16,
+    take: bool,
 }
 
 impl Roll {
@@ -211,7 +210,7 @@ impl Roll {
         for _ in 0..self.amount {
             loop {
                 let val = rng.gen_range(1..=self.sides);
-                dice.push(Die { val, drop: false });
+                dice.push(Die { val, take: true });
                 if !(self.exploding && val == self.sides) {
                     break;
                 }
@@ -221,7 +220,7 @@ impl Roll {
         if let Some(select) = &self.select {
             let n = select.amount as usize;
             dice.sort_unstable();
-            let drop_die = |d: &mut Die| d.drop = true;
+            let drop_die = |d: &mut Die| d.take = false;
             match (select.action, select.which) {
                 (SelectAction::Keep, SelectWhich::High) => {
                     dice.iter_mut().rev().skip(n).for_each(drop_die);
@@ -243,22 +242,47 @@ impl Roll {
 }
 
 impl RollResult {
-    pub fn roll(&self) -> &Roll {
-        &self.roll
-    }
-
     /// Results obtained
-    pub fn rolled_dice(&self) -> &[Die] {
-        &self.dice
+    ///
+    /// The iterator returns a tuple of the value rolled and bool that indicates
+    /// if the dice is kept or not.
+    pub fn all_dice(&self) -> impl Iterator<Item = (u16, bool)> + '_ {
+        self.dice.iter().map(|d| (d.val, d.take))
     }
 
-    pub fn taken_dice(&self) -> impl Iterator<Item = u16> + '_ {
-        self.dice.iter().filter_map(|d| (!d.drop).then_some(d.val))
+    /// Iterator of dice values
+    ///
+    /// This is after keep/drop of high/low
+    pub fn dice(&self) -> impl Iterator<Item = u16> + '_ {
+        self.dice.iter().filter_map(|d| d.take.then_some(d.val))
+    }
+
+    /// Amount of dice
+    ///
+    /// The first element is the original amount and the second the number
+    /// of dice rolled. This can differ if the roll was exploding.
+    pub fn amount(&self) -> (usize, usize) {
+        (self.roll.amount as usize, self.dice.len())
+    }
+
+    /// Sides of the rolled dice
+    pub fn sides(&self) -> u16 {
+        self.roll.sides
+    }
+
+    /// Modifier applied
+    pub fn modifier(&self) -> i32 {
+        self.roll.modifier
+    }
+
+    /// If the roll was exploding
+    pub fn was_exploding(&self) -> bool {
+        self.roll.exploding
     }
 
     /// Total value
     pub fn total(&self) -> i32 {
-        self.taken_dice().map(|v| v as i32).sum::<i32>() + self.roll.modifier
+        self.dice().map(|v| v as i32).sum::<i32>() + self.roll.modifier
     }
 }
 
@@ -286,10 +310,10 @@ impl Display for RollResult {
 
 impl Display for Die {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        if self.drop {
-            write!(f, "{}{}", self.val.dimmed().red(), "d".dimmed().red())
-        } else {
+        if self.take {
             self.val.fmt(f)
+        } else {
+            write!(f, "{}{}", self.val.dimmed().red(), "d".dimmed().red())
         }
     }
 }

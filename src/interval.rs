@@ -182,22 +182,38 @@ impl Display for Interval {
 /// The [`Display`] [alternate modifier](std::fmt#sign0) will only print
 /// the sampled value.
 #[derive(Debug, Clone, PartialEq)]
-pub struct IntervalResult {
+pub struct IntervalSample {
     /// Original interval
-    pub interval: Interval,
+    interval: Interval,
     /// Value obtained
-    pub value: Num,
+    value: Num,
 }
 
 /// Either an [`Int`] or a [`Float`].
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Num {
     Int(Int),
     Float(Float),
 }
 
+impl IntervalSample {
+    /// Sampled value
+    pub fn value(&self) -> Num {
+        self.value
+    }
+
+    /// Start endpoint from the source interval and boolean true if included
+    pub fn start(&self) -> (Num, bool) {
+        self.interval.start()
+    }
+    /// End endpoint from the source interval and boolean true if included
+    pub fn end(&self) -> (Num, bool) {
+        self.interval.end()
+    }
+}
+
 impl Interval {
-    pub(crate) fn eval(&self, rng: &mut Pcg) -> IntervalResult {
+    pub(crate) fn eval(&self, rng: &mut Pcg) -> IntervalSample {
         let Interval {
             low_inc,
             high_inc,
@@ -223,14 +239,44 @@ impl Interval {
                 Num::Float(f)
             }
         };
-        IntervalResult {
+        IntervalSample {
             interval: self.clone(),
             value,
         }
     }
+
+    fn start(&self) -> (Num, bool) {
+        let inc = self.low_inc;
+        let n = match &self.kind {
+            IntervalKind::Int(r) => {
+                let mut start = r.start;
+                if !inc {
+                    start -= 1;
+                }
+                Num::Int(start)
+            }
+            IntervalKind::Float(r) => Num::Float(r.start),
+        };
+        (n, inc)
+    }
+
+    fn end(&self) -> (Num, bool) {
+        let inc = self.high_inc;
+        let n = match &self.kind {
+            IntervalKind::Int(r) => {
+                let mut end = r.end;
+                if inc {
+                    end -= 1;
+                }
+                Num::Int(end)
+            }
+            IntervalKind::Float(r) => Num::Float(r.end),
+        };
+        (n, inc)
+    }
 }
 
-impl Display for IntervalResult {
+impl Display for IntervalSample {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         if f.alternate() {
             self.value.fmt(f)
@@ -294,5 +340,22 @@ mod tests {
             IntervalKind::Int(_) => panic!("not float"),
             IntervalKind::Float(r) => (r, interval.low_inc, interval.high_inc),
         }
+    }
+
+    #[test_case("1..5" => (Num::Int(1), true) ; "range")]
+    #[test_case("[1..5]" => (Num::Int(1), true) ; "inclusive")]
+    #[test_case("(1..5]" => (Num::Int(1), false) ; "exclusive")]
+    fn interval_start(s: &str) -> (Num, bool) {
+        let interval = s.parse::<Interval>().expect("failed to parse");
+        interval.start()
+    }
+
+    #[test_case("1..5" => (Num::Int(5), false) ; "range exclusive")]
+    #[test_case("1..=5" => (Num::Int(5), true) ; "range inclusive")]
+    #[test_case("[1..5]" => (Num::Int(5), true) ; "inclusive")]
+    #[test_case("[1..5)" => (Num::Int(5), false) ; "exclusive")]
+    fn interval_end(s: &str) -> (Num, bool) {
+        let interval = s.parse::<Interval>().expect("failed to parse");
+        interval.end()
     }
 }
