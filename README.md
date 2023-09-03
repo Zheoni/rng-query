@@ -1,4 +1,11 @@
 # RNG Query
+
+[![crates.io](https://img.shields.io/crates/v/rng-query)](https://crates.io/crates/rng-query)
+[![docs.rs](https://img.shields.io/docsrs/rng-query)](https://docs.rs/rng-query/)
+[![license](https://img.shields.io/crates/l/rng-query)](./LICENSE)
+
+> CLI to use pseudorandomness the easy way and help me with decision paralysis
+
 ```
 "a, b, c"                 => choose a, b or c at random
 "a, b, c / 2"             => chose 2 values
@@ -21,6 +28,8 @@ rq "your query"   # run a quick query
 rq                # will get you into a REPL
 rq --help         # see all options
 ```
+
+There are also precompiled binaries in the github releases.
 
 With the CLI you can read from `stdin`, files, treat files as only data and
 combine it with an inline query.
@@ -119,13 +128,11 @@ Sides can also be `%` which equals to `100`.
 
 `!` is exploding. If rolled the maximum value, roll another die.
 
-For select you can add `<k|d>[h|l][n]`. You can have.
+For select you can add `<k|d>[h|l][n]`. If `n` is not given, it's 1. You can have.
 - `k` or `kh` to keep the highest `n` dice.
 - `kl` to keep the lowest `n` dice.
 - `d` or `dl` to drop the lowest `n` dice.
 - `dh` to drop the `n` highest dice.
-
-If `n` is not given, it's 1.
 
 The modifer is `<+|->[m]` to add or subtract a value to the total result. You
 can specify more than one.

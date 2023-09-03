@@ -2,6 +2,12 @@
 //!
 //! See <https://github.com/Zheoni/rng-query> for the syntax and CLI.
 //!
+//! ## Usage as a lib
+//!
+//! `rng-query` is mainly the CLI app, so this lib is not the main objective. I
+//! will try to follow [semver](https://semver.org/) but for the lib it's not a
+//! guarantee, so you may want to pin a specific version.
+//!
 //! Run a whole input with [`run`] or manage line by line with [`State`] and it
 //! methods.
 //!
