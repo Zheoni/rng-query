@@ -30,6 +30,10 @@ For example, choose 2 lines from a file keeping the input order:
 rq -F input.txt "/ 2o"
 ```
 
+Input files will be stored in memory with a little overhead. Therefore, very
+large files may use a lot of memory. It is possible to avoid this, but it's
+currently not in the scope of this project.
+
 ## Syntax
 Each query works like a stack where you push entries separated by `,` or a
 newline. Then, everything AFTER `/`, UNTIL `;` or the end of the line are

@@ -9,19 +9,17 @@
 //! Use something like [anstream](https://docs.rs/anstream/) if you dont want
 //! colors.
 
-pub mod coin;
-pub mod dice;
+mod coin;
+mod dice;
 mod entry;
-pub mod interval;
+mod interval;
 mod parse;
 
-use std::collections::HashMap;
 use std::fmt::Display;
 use std::rc::Rc;
 use std::str::FromStr;
 
-use entry::BufferedEntry;
-use entry::EntryData;
+use entry::SharedEntry;
 use parse::{split_line_parts, QueryPart, SplitPartsError};
 use rand::seq::SliceRandom;
 use rand::SeedableRng;
@@ -204,9 +202,8 @@ impl FromStr for Options {
 /// Query interpreter
 #[derive(Debug, Clone, PartialEq)]
 pub struct State {
-    stack: Vec<BufferedEntry>,
+    stack: Vec<Rc<str>>,
     rng: Pcg,
-    entry_counter: usize,
     /// See [`Separators`]
     pub sep: Separators,
 }
@@ -226,7 +223,6 @@ impl State {
         Self {
             stack: Vec::new(),
             rng,
-            entry_counter: 0,
             sep: Separators::default(),
         }
     }
@@ -280,13 +276,7 @@ impl State {
         if entry.is_empty() {
             return;
         }
-        let data = EntryData::Text(Rc::from(entry));
-        let id = self.entry_counter;
-        self.entry_counter = self
-            .entry_counter
-            .checked_add(1)
-            .expect("somehow you managed to get to the maximum number of entries. congrats.");
-        self.stack.push(BufferedEntry { id, data });
+        self.stack.push(Rc::from(entry));
     }
 
     /// Signal the interpreter the end of the input
@@ -303,18 +293,30 @@ impl State {
             EvalExpr::Auto => self.stack.len() == 1,
             EvalExpr::Custom(r) => r,
         };
-        let selected = select(&mut self.rng, &self.stack, options, eval_expr)?;
+
+        // leave stack empty
+        let entries = std::mem::take(&mut self.stack);
+
+        // Make the entries shared to avoid copied data if repeated and add id
+        // to sort them if needed. Also, if eval, parse everything so the same
+        // query always fails/succeed no matter of the RNG state.
+        let mut shared = Vec::with_capacity(entries.len());
+        for (id, t) in entries.into_iter().enumerate() {
+            let entry = SharedEntry::new(t, eval_expr)?;
+            shared.push((id, entry));
+        }
+
+        let selected = select(&mut self.rng, shared, options);
 
         let output = selected
             .into_iter()
-            .map(|e| e.eval(&mut self.rng))
-            .collect();
-
-        self.stack.clear();
+            .map(|(_, e)| e.eval(&mut self.rng))
+            .collect::<Vec<_>>();
 
         if options.push {
-            for val in &output {
-                self.add_entry(&format!("{val:#}"));
+            self.stack.reserve(output.len());
+            for e in output {
+                self.stack.push(e.into_raw())
             }
             return Ok(StmtOutput(vec![]));
         }
@@ -325,12 +327,11 @@ impl State {
 
 fn select(
     rng: &mut Pcg,
-    entries: &[BufferedEntry],
+    mut entries: Vec<(usize, SharedEntry)>,
     options: Options,
-    eval_expr: bool,
-) -> Result<Vec<BufferedEntry>, Error> {
+) -> Vec<(usize, SharedEntry)> {
     if entries.is_empty() {
-        return Ok(vec![]);
+        return vec![];
     }
 
     let n = match options.amount {
@@ -338,53 +339,30 @@ fn select(
         Amount::N(n) => n as usize,
     };
 
-    let parse = |entry: &BufferedEntry| -> Result<BufferedEntry, Error> {
-        if eval_expr {
-            if let EntryData::Text(t) = &entry.data {
-                let data = entry::parse_expr(t)?;
-                return Ok(BufferedEntry { id: entry.id, data });
-            }
-        }
-        Ok(entry.clone())
-    };
-
     // optimization for all
     if n == entries.len() {
-        let mut entries = entries.iter().map(parse).collect::<Result<Vec<_>, _>>()?;
         if !options.keep_order {
             entries.shuffle(rng);
         }
-        return Ok(entries);
+        return entries;
     }
 
     // general case
     let mut selected = if options.repeating {
-        let mut cache = HashMap::<usize, BufferedEntry>::new();
-
         let mut selected = Vec::with_capacity(n);
         for _ in 0..n {
             let entry = entries.choose(rng).unwrap();
-            let entry = if let Some(cached) = cache.get(&entry.id) {
-                cached.clone()
-            } else {
-                let parsed = parse(entry)?;
-                cache.insert(parsed.id, parsed.clone());
-                parsed
-            };
-            selected.push(entry);
+            selected.push(entry.clone());
         }
         selected
     } else {
-        entries
-            .choose_multiple(rng, n)
-            .map(parse)
-            .collect::<Result<Vec<_>, _>>()?
+        entries.choose_multiple(rng, n).cloned().collect()
     };
 
     if options.keep_order {
-        selected.sort_unstable_by_key(|e| e.id);
+        selected.sort_unstable_by_key(|e| e.0);
     }
-    Ok(selected)
+    selected
 }
 
 /// Output of a query
