@@ -12,29 +12,39 @@ use std::{fmt::Display, str::FromStr};
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Roll {
     /// Number of dice
-    pub amount: u16,
+    amount: u16,
     /// Number of sides
-    pub sides: u16,
-    pub exploding: bool,
-    pub select: Option<SelectDice>,
-    pub modifier: i32,
+    sides: u16,
+    /// Use exploding dice
+    ///
+    /// If a die results in it's maximum value (number of sides) an extra die
+    /// is rolled.
+    exploding: bool,
+    /// See [`SelectDice`]
+    select: Option<SelectDice>,
+    /// Amount to add/subtract to the sum of the rolls
+    modifier: i32,
+}
+
+/// Select a subset of the total dice rolled
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct SelectDice {
+    /// Number of dice to select
+    amount: u16,
+    /// What to do with the selected dice
+    action: SelectAction,
+    /// Which dice to select
+    which: SelectWhich,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct SelectDice {
-    pub amount: u16,
-    pub action: SelectAction,
-    pub which: SelectWhich,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum SelectAction {
+enum SelectAction {
     Keep,
     Drop,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum SelectWhich {
+enum SelectWhich {
     High,
     Low,
 }
@@ -184,14 +194,14 @@ impl Display for Roll {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RollResult {
     /// Original roll description
-    pub roll: Roll,
+    roll: Roll,
     dice: Vec<Die>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Die {
     pub val: u16,
-    pub take: bool,
+    pub drop: bool,
 }
 
 impl Roll {
@@ -201,7 +211,7 @@ impl Roll {
         for _ in 0..self.amount {
             loop {
                 let val = rng.gen_range(1..=self.sides);
-                dice.push(Die { val, take: true });
+                dice.push(Die { val, drop: false });
                 if !(self.exploding && val == self.sides) {
                     break;
                 }
@@ -211,7 +221,7 @@ impl Roll {
         if let Some(select) = &self.select {
             let n = select.amount as usize;
             dice.sort_unstable();
-            let drop_die = |d: &mut Die| d.take = false;
+            let drop_die = |d: &mut Die| d.drop = true;
             match (select.action, select.which) {
                 (SelectAction::Keep, SelectWhich::High) => {
                     dice.iter_mut().rev().skip(n).for_each(drop_die);
@@ -233,13 +243,17 @@ impl Roll {
 }
 
 impl RollResult {
+    pub fn roll(&self) -> &Roll {
+        &self.roll
+    }
+
     /// Results obtained
     pub fn rolled_dice(&self) -> &[Die] {
         &self.dice
     }
 
     pub fn taken_dice(&self) -> impl Iterator<Item = u16> + '_ {
-        self.dice.iter().filter_map(|d| d.take.then_some(d.val))
+        self.dice.iter().filter_map(|d| (!d.drop).then_some(d.val))
     }
 
     /// Total value
@@ -272,10 +286,10 @@ impl Display for RollResult {
 
 impl Display for Die {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        if self.take {
-            self.val.fmt(f)
-        } else {
+        if self.drop {
             write!(f, "{}{}", self.val.dimmed().red(), "d".dimmed().red())
+        } else {
+            self.val.fmt(f)
         }
     }
 }
