@@ -11,8 +11,8 @@ use rand::{
     Rng,
 };
 
-use crate::regex;
-use crate::Pcg;
+use crate::{eval::Eval, regex};
+use crate::{eval::Sample, Pcg};
 
 /// Int type used in the interval
 pub type Int = i32;
@@ -170,7 +170,7 @@ impl Display for Interval {
             }
         }
 
-        match self.low_inc {
+        match self.high_inc {
             true => f.write_char(']'),
             false => f.write_char(')'),
         }
@@ -182,7 +182,7 @@ impl Display for Interval {
 /// The [`Display`] [alternate modifier](std::fmt#sign0) will only print
 /// the sampled value.
 #[derive(Debug, Clone, PartialEq)]
-pub struct IntervalSample {
+struct IntervalSample {
     /// Original interval
     interval: Interval,
     /// Value obtained
@@ -191,34 +191,18 @@ pub struct IntervalSample {
 
 /// Either an [`Int`] or a [`Float`].
 #[derive(Debug, Clone, Copy, PartialEq)]
-pub enum Num {
+enum Num {
     Int(Int),
     Float(Float),
 }
 
-impl IntervalSample {
-    /// Sampled value
-    pub fn value(&self) -> Num {
-        self.value
-    }
-
-    /// Start endpoint from the source interval and boolean true if included
-    pub fn start(&self) -> (Num, bool) {
-        self.interval.start()
-    }
-    /// End endpoint from the source interval and boolean true if included
-    pub fn end(&self) -> (Num, bool) {
-        self.interval.end()
-    }
-}
-
-impl Interval {
-    pub(crate) fn eval(&self, rng: &mut Pcg) -> IntervalSample {
+impl Eval for Interval {
+    fn eval(&self, rng: &mut Pcg) -> Vec<Sample> {
         let Interval {
             low_inc,
             high_inc,
             kind,
-        } = self;
+        } = &self;
         let value = match kind {
             IntervalKind::Int(r) => Num::Int(rng.gen_range(r.clone())),
             IntervalKind::Float(r) => {
@@ -239,40 +223,10 @@ impl Interval {
                 Num::Float(f)
             }
         };
-        IntervalSample {
-            interval: self.clone(),
+        vec![Sample::expr(Box::new(IntervalSample {
             value,
-        }
-    }
-
-    fn start(&self) -> (Num, bool) {
-        let inc = self.low_inc;
-        let n = match &self.kind {
-            IntervalKind::Int(r) => {
-                let mut start = r.start;
-                if !inc {
-                    start -= 1;
-                }
-                Num::Int(start)
-            }
-            IntervalKind::Float(r) => Num::Float(r.start),
-        };
-        (n, inc)
-    }
-
-    fn end(&self) -> (Num, bool) {
-        let inc = self.high_inc;
-        let n = match &self.kind {
-            IntervalKind::Int(r) => {
-                let mut end = r.end;
-                if inc {
-                    end -= 1;
-                }
-                Num::Int(end)
-            }
-            IntervalKind::Float(r) => Num::Float(r.end),
-        };
-        (n, inc)
+            interval: self.clone(),
+        }))]
     }
 }
 
@@ -339,6 +293,38 @@ mod tests {
         match interval.kind {
             IntervalKind::Int(_) => panic!("not float"),
             IntervalKind::Float(r) => (r, interval.low_inc, interval.high_inc),
+        }
+    }
+
+    impl Interval {
+        fn start(&self) -> (Num, bool) {
+            let inc = self.low_inc;
+            let n = match &self.kind {
+                IntervalKind::Int(r) => {
+                    let mut start = r.start;
+                    if !inc {
+                        start -= 1;
+                    }
+                    Num::Int(start)
+                }
+                IntervalKind::Float(r) => Num::Float(r.start),
+            };
+            (n, inc)
+        }
+
+        fn end(&self) -> (Num, bool) {
+            let inc = self.high_inc;
+            let n = match &self.kind {
+                IntervalKind::Int(r) => {
+                    let mut end = r.end;
+                    if inc {
+                        end -= 1;
+                    }
+                    Num::Int(end)
+                }
+                IntervalKind::Float(r) => Num::Float(r.end),
+            };
+            (n, inc)
         }
     }
 

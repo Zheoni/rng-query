@@ -1,280 +1,228 @@
-use crate::Separators;
+use std::rc::Rc;
 
-pub(crate) fn split_line_parts(
-    line: &str,
-    sep: Separators,
-) -> impl Iterator<Item = Result<QueryPart<'_>, SplitPartsError>> {
-    debug_assert!(!line.contains('\n'), "unexpected newline. this is a bug");
-    let mut split = SplitParts::new(line, sep);
-    let mut error = false;
-    std::iter::from_fn(move || {
-        if error {
-            return None;
-        }
-        let val = split.next()?;
-        if val.is_err() {
-            error = true;
-        }
-        Some(val)
-    })
-    .fuse()
-}
+use crate::{ast, regex, Error};
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) enum QueryPart<'i> {
-    Entry(&'i str),
-    Options(&'i str),
-    EndStmt,
-}
-
-#[derive(Debug, thiserror::Error)]
-pub enum SplitPartsError {
-    #[error("missing trailing '\"' to close a string")]
-    UnclosedString { start: usize },
-    #[error("unbalanced {what}")]
-    UnbalancedNesting { problem: usize, what: &'static str },
+#[derive(Debug)]
+struct Query<'a> {
+    entries: Vec<Entry<'a>>,
+    options: Option<&'a str>,
 }
 
 #[derive(Debug)]
-struct SplitParts<'i> {
-    line: &'i str,
-    sep: Separators,
-    last_end: usize,
-    chars: std::str::Chars<'i>,
-    mode: Mode,
+enum Entry<'a> {
+    Query(Box<Query<'a>>),
+    Entry(&'a str),
 }
 
-#[derive(Debug, PartialEq, Eq, Clone, Copy)]
-enum Mode {
-    Entry,
-    Options,
-    EndStmt,
+struct Cursor<'a> {
+    input: &'a str,
+    chars: std::str::Chars<'a>,
+    slice_start: usize,
 }
 
-impl<'i> SplitParts<'i> {
-    fn new(line: &'i str, sep: Separators) -> Self {
-        Self {
-            line,
-            sep,
-            last_end: 0,
-            chars: line.chars(),
-            mode: Mode::Entry,
+impl<'a> Cursor<'a> {
+    fn new(input: &'a str) -> Cursor<'a> {
+        Cursor {
+            input,
+            chars: input.chars(),
+            slice_start: 0,
         }
     }
 
-    fn current_offset(&self) -> usize {
-        let remaining = self.chars.as_str().len();
-        self.line.len() - remaining
+    fn first(&self) -> Option<char> {
+        self.chars.clone().next()
     }
 
-    fn take_slice(&mut self) -> &'i str {
-        let current = self.current_offset();
-        let s = &self.line[self.last_end..current];
-        self.last_end = current;
-        s
+    fn eat(&mut self) -> Option<char> {
+        self.chars.next()
     }
 
-    fn consume_string(&mut self) -> Result<(), SplitPartsError> {
-        let mut end = false;
-        #[allow(clippy::while_let_on_iterator)] // i like this syntax more here
-        while let Some(c) = self.chars.next() {
-            if c == '"' {
-                end = true;
+    fn current_pos(&self) -> usize {
+        self.input.len() - self.chars.as_str().len()
+    }
+
+    fn set_start(&mut self) {
+        self.slice_start = self.current_pos();
+    }
+
+    fn take_slice(&mut self) -> &'a str {
+        let cur = self.current_pos();
+        let start = self.slice_start;
+        self.slice_start = cur;
+        &self.input[start..cur]
+    }
+
+    fn eat_until(&mut self, f: impl Fn(char) -> bool) -> bool {
+        let mut last = '\0';
+        while let Some(c) = self.first() {
+            if last != '\\' && f(c) {
+                return true;
+            }
+            last = c;
+            self.eat();
+        }
+        false
+    }
+}
+
+fn parse_query_rec<'a>(cursor: &mut Cursor<'a>, is_root: bool) -> Result<Query<'a>, String> {
+    let mut entries = Vec::new();
+    let mut options = None;
+
+    cursor.set_start(); // mark start
+
+    fn take_entry<'a>(cursor: &mut Cursor<'a>, trim_last: bool) -> Entry<'a> {
+        let mut s = cursor.take_slice();
+        if trim_last && !s.is_empty() {
+            s = &s[..s.len() - 1]; // this may be a problem with utf8 codepoints
+        }
+        s = s.trim();
+        Entry::Entry(s)
+    }
+
+    let mut end_found = false;
+    while let Some(c) = cursor.eat() {
+        match c {
+            '{' => {
+                let q = parse_query_rec(cursor, false)?;
+                entries.push(Entry::Query(Box::new(q)));
+            }
+            '}' => {
+                end_found = true;
+                if is_root {
+                    return Err("unexpected '}'".to_string());
+                }
+                if options.is_none() {
+                    entries.push(take_entry(cursor, true)); // push last entry
+                }
+                cursor.set_start(); // skip '}' for next slice
                 break;
             }
-        }
-        if !end {
-            return Err(SplitPartsError::UnclosedString {
-                start: self.current_offset(),
-            });
-        }
-        Ok(())
-    }
+            '[' | '(' => {
+                let found = cursor.eat_until(|c| c == ']' || c == ')');
+                if !found {
+                    return Err("unbalanced parenthesis/square brackets".to_string());
+                }
+                cursor.eat();
+            }
+            '"' | '\'' => {
+                let found = cursor.eat_until(|cc| cc == c);
+                if !found {
+                    return Err("unclosed string".to_string());
+                }
+                cursor.eat();
+            }
+            ',' | '\n' => {
+                entries.push(take_entry(cursor, true));
+            }
+            '/' => {
+                entries.push(take_entry(cursor, true)); // push last entry
 
-    fn consume_options(&mut self) -> Option<Result<QueryPart<'i>, SplitPartsError>> {
-        // consume until end stmt is found or line ends
-        let end_found = self.chars.any(|c| c == self.sep.stmt);
-        if end_found {
-            self.mode = Mode::EndStmt;
+                cursor.eat_until(|c| c == '}');
+                let s = cursor.take_slice().trim();
+                if s.is_empty() {
+                    return Err("empty options".to_string());
+                }
+                if options.is_some() {
+                    return Err("multiple options".to_string());
+                }
+                options = Some(s);
+            }
+            _ => {}
+        }
+    }
+    if !is_root && !end_found {
+        return Err("missing '}'".to_string());
+    }
+    if is_root && options.is_none() {
+        entries.push(take_entry(cursor, false));
+    }
+    entries.retain(|e| {
+        if let Entry::Entry(s) = e {
+            !s.is_empty()
         } else {
-            self.mode = Mode::Entry;
+            true
         }
-        let options = self.take_slice().trim_end_matches(self.sep.stmt).trim();
-        return Some(Ok(QueryPart::Options(options)));
-    }
+    });
 
-    fn next_entry(&mut self) -> Option<Result<QueryPart<'i>, SplitPartsError>> {
-        if self.chars.as_str().is_empty() {
-            return None;
-        }
-
-        // Stack can be local because an entry is never returned if the stack is
-        // not empty
-        let mut stack = Vec::new();
-
-        while let Some(c) = self.chars.next() {
-            match c {
-                '"' => {
-                    if let Err(e) = self.consume_string() {
-                        return Some(Err(e));
-                    }
-                }
-                '(' | '[' | '{' => stack.push(Nest::from_char(c)),
-                ']' | ')' | '}' => match stack.last() {
-                    Some(pending) if pending.matches(Nest::from_char(c)) => {
-                        stack.pop();
-                    }
-                    Some(pending) => {
-                        return Some(Err(SplitPartsError::UnbalancedNesting {
-                            problem: self.current_offset(),
-                            what: pending.repr(),
-                        }))
-                    }
-                    None => {
-                        return Some(Err(SplitPartsError::UnbalancedNesting {
-                            problem: self.current_offset(),
-                            what: Nest::from_char(c).repr(),
-                        }));
-                    }
-                },
-                c if c == self.sep.entry && stack.is_empty() => {
-                    let e = trim_entry(self.take_slice(), c);
-                    return Some(Ok(QueryPart::Entry(e)));
-                }
-                c if c == self.sep.options && stack.is_empty() => {
-                    let e = trim_entry(self.take_slice(), c);
-                    self.mode = Mode::Options;
-                    if e.is_empty() {
-                        return self.next();
-                    } else {
-                        return Some(Ok(QueryPart::Entry(e)));
-                    }
-                }
-                c if c == self.sep.stmt && stack.is_empty() => {
-                    let e = trim_entry(self.take_slice(), c);
-                    self.mode = Mode::EndStmt;
-                    if e.is_empty() {
-                        return self.next();
-                    } else {
-                        return Some(Ok(QueryPart::Entry(e)));
-                    }
-                }
-                _ => {}
-            }
-        }
-
-        // if here, it means no more special chars so consume everything
-        match stack.last() {
-            None => {
-                let e = trim_entry(&self.line[self.last_end..], self.sep.entry);
-                self.last_end = self.line.len();
-                Some(Ok(QueryPart::Entry(e)))
-            }
-            Some(pending) => Some(Err(SplitPartsError::UnbalancedNesting {
-                problem: self.line.len(),
-                what: pending.repr(),
-            })),
-        }
-    }
+    Ok(Query { entries, options })
 }
 
-impl<'i> Iterator for SplitParts<'i> {
-    type Item = Result<QueryPart<'i>, SplitPartsError>;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        match self.mode {
-            Mode::Options => self.consume_options(),
-            Mode::EndStmt => {
-                self.mode = Mode::Entry;
-                Some(Ok(QueryPart::EndStmt))
-            }
-            Mode::Entry => self.next_entry(),
-        }
-    }
+fn build_ast(q: &Query) -> Result<ast::Query, Error> {
+    let root = ast_choose(q)?;
+    Ok(ast::Query { root })
 }
 
-fn trim_entry(mut entry: &str, sep: char) -> &str {
-    entry = entry.trim_end_matches(sep).trim();
-    if entry.starts_with('"')
-        && entry.ends_with('"')
-        && entry.chars().filter(|&c| c == '"').count() == 2
-    {
-        entry = entry.trim_matches('"').trim()
+fn ast_choose(q: &Query) -> Result<ast::Choose, Error> {
+    let mut entries = Vec::with_capacity(q.entries.len());
+    for (id, entry) in q.entries.iter().enumerate() {
+        let e = ast_entry(entry)?;
+        entries.push((id, e));
     }
-    entry
+
+    let options = if let Some(options) = q.options {
+        ast_options(options)?
+    } else {
+        ast::ChooseOptions::default()
+    };
+
+    Ok(ast::Choose { entries, options })
 }
 
-#[derive(Debug, PartialEq, Eq, Clone, Copy)]
-enum Nest {
-    Paren,
-    Square,
-    Curly,
-}
-impl Nest {
-    fn from_char(c: char) -> Self {
-        match c {
-            '(' | ')' => Self::Paren,
-            '[' | ']' => Self::Square,
-            '{' | '}' => Self::Curly,
-            _ => panic!("unknown nested symbol"),
-        }
-    }
-    fn repr(self) -> &'static str {
-        match self {
-            Nest::Paren => "parenthesis",
-            Nest::Square => "square brackets",
-            Nest::Curly => "curly braces",
-        }
-    }
-    fn matches(self, other: Self) -> bool {
-        if self == other {
-            return true;
-        }
-        // other matches
-        match self {
-            Nest::Paren | Nest::Square => matches!(other, Self::Paren | Self::Square),
-            _ => false,
-        }
-    }
+fn ast_entry(entry: &Entry) -> Result<ast::Entry, Error> {
+    let e = match entry {
+        Entry::Query(q) => ast::Entry::Expr(Rc::new(ast_choose(q)?)),
+        Entry::Entry(e) => ast::Entry::parse(e)?,
+    };
+    Ok(e)
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use test_case::test_case;
-    use QueryPart::Entry as E;
-    use QueryPart::*;
+fn ast_options(s: &str) -> Result<ast::ChooseOptions, Error> {
+    match s {
+        "shuffle" => return Ok(ast::ChooseOptions::shuffle()),
+        "list" => return Ok(ast::ChooseOptions::list()),
+        _ => {}
+    };
 
-    #[test_case("a, b, c" => vec![E("a"), E("b"), E("c")]; "basic")]
-    #[test_case("a,, c" => vec![E("a"), E(""), E("c")]; "empty entries")]
-    #[test_case("(a, b), c" => vec![E("(a, b)"), E("c")]; "parens")]
-    #[test_case("[a, b], c" => vec![E("[a, b]"), E("c")]; "square")]
-    #[test_case("{a, b}, c" => vec![E("{a, b}"), E("c")]; "curly")]
-    #[test_case("[a, b), c" => vec![E("[a, b)"), E("c")]; "mixed1")]
-    #[test_case("(a, b], c" => vec![E("(a, b]"), E("c")]; "mixed2")]
-    #[test_case("\"a, b \", c" => vec![E("a, b"), E("c")]; "string only")]
-    #[test_case("\"a,\" b, c" => vec![E("\"a,\" b"), E("c")]; "string mixed")]
-    #[test_case("\"s1\" out \"s2\"" => vec![E("\"s1\" out \"s2\"")]; "multiple strings")]
-    #[test_case("({this)}" => panics "unbalanced curly braces"; "unbalanced")]
-    #[test_case("({this}" => panics "unbalanced parenthesis"; "unclosed")]
-    #[test_case("{this}]" => panics "unbalanced square brackets"; "unopened")]
-    #[test_case("\"partial string" => panics; "unclosed string")]
-    #[test_case("text \"partial string" => panics; "unclosed string mixed")]
-    #[test_case("a, b / options" => vec![E("a"), E("b"), Options("options")]; "basic options")]
-    #[test_case("a; b" => vec![E("a"), EndStmt, E("b")]; "2 stmt")]
-    #[test_case("a / opt; b / opt 2" => vec![E("a"), Options("opt"), EndStmt, E("b"), Options("opt 2")]; "2 stmt with options")]
-    #[test_case("a / opt;" => vec![E("a"), Options("opt"), EndStmt]; "options trailing")]
-    #[test_case("/ opt" => vec![Options("opt")]; "only options")]
-    #[test_case("a /" => vec![E("a"), Options("")]; "empty options")]
-    #[test_case("/" => vec![Options("")]; "only empty options")]
-    #[test_case("(a;b);c" => vec![E("(a;b)"), EndStmt, E("c")]; "escaped nested stmt sep")]
-    #[test_case("\"a;b\";c" => vec![E("a;b"), EndStmt, E("c")]; "escaped string stmt sep")]
-    #[test_case("(a/b)/c" => vec![E("(a/b)"), Options("c")]; "escaped nested opts sep")]
-    #[test_case("\"a/b\"/c" => vec![E("a/b"), Options("c")]; "escaped string opts sep")]
-    fn split_parts(s: &str) -> Vec<QueryPart> {
-        match split_line_parts(s, Separators::default()).collect::<Result<_, _>>() {
-            Ok(v) => v,
-            Err(e) => panic!("{e}"),
-        }
+    let re = regex!(r"\A(all\b|(?:[0-9]+))?([ ro]*)\z");
+    let cap = re
+        .captures(s)
+        .ok_or_else(|| Error::Options(format!("Bad options: {s:?}")))?;
+    let amount = match cap.get(1).map(|m| m.as_str().trim_end()) {
+        Some("all") => ast::Amount::All,
+        Some(n) => n
+            .parse::<u32>()
+            .map(ast::Amount::N)
+            .map_err(|e| Error::Options(format!("Bad amount: {e}")))?,
+        None => ast::Amount::N(1),
+    };
+
+    let mut flags = cap[2]
+        .chars()
+        .filter(|c| !c.is_ascii_whitespace())
+        .collect::<Vec<_>>();
+    flags.sort();
+    let all_len = flags.len();
+    flags.dedup();
+    let unique_len = flags.len();
+    if all_len != unique_len {
+        return Err(Error::Options(format!(
+            "Duplicate flags: {}",
+            flags.iter().collect::<String>()
+        )));
     }
+    let repeating = flags.contains(&'r');
+    let keep_order = flags.contains(&'o');
+
+    Ok(ast::ChooseOptions {
+        amount,
+        repeating,
+        keep_order,
+    })
+}
+
+pub fn parse_query(input: &str) -> Result<ast::Query, Error> {
+    let mut cursor = Cursor::new(input);
+    let q = parse_query_rec(&mut cursor, true).map_err(Error::ParseQuery)?;
+    build_ast(&q)
 }

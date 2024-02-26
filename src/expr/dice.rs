@@ -3,6 +3,8 @@
 use owo_colors::OwoColorize;
 use rand::Rng;
 
+use crate::eval::Eval;
+use crate::eval::Sample;
 use crate::regex;
 use crate::Pcg;
 use std::fmt::Write;
@@ -192,7 +194,7 @@ impl Display for Roll {
 /// The [`Display`] [alternate modifier](std::fmt#sign0) will only print
 /// [`RollResult::total`].
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct RollResult {
+struct RollSample {
     roll: Roll,
     dice: Vec<Die>,
 }
@@ -203,8 +205,8 @@ struct Die {
     take: bool,
 }
 
-impl Roll {
-    pub(crate) fn eval(&self, rng: &mut Pcg) -> RollResult {
+impl Eval for Roll {
+    fn eval(&self, rng: &mut Pcg) -> Vec<Sample> {
         let mut dice = Vec::new();
 
         for _ in 0..self.amount {
@@ -237,11 +239,12 @@ impl Roll {
             }
         }
 
-        RollResult { roll: *self, dice }
+        vec![Sample::expr(Box::new(RollSample { roll: *self, dice }))]
     }
 }
 
-impl RollResult {
+#[allow(unused)] // for the future maybe?
+impl RollSample {
     /// Results obtained
     ///
     /// The iterator returns a tuple of the value rolled and bool that indicates
@@ -286,7 +289,7 @@ impl RollResult {
     }
 }
 
-impl Display for RollResult {
+impl Display for RollSample {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         if f.alternate() {
             return self.total().fmt(f);
