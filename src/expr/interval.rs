@@ -34,13 +34,22 @@ enum IntervalKind {
 }
 
 /// Error from [`Interval::from_str`]
-#[derive(Debug, thiserror::Error)]
+#[derive(Debug)]
 pub enum IntervalParseError {
-    #[error("the input is not an interval")]
     NoMatch,
-    #[error("invalid interval: {0}")]
     Invalid(String),
 }
+
+impl std::fmt::Display for IntervalParseError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            IntervalParseError::NoMatch => f.write_str("the input is not an interval"),
+            IntervalParseError::Invalid(e) => write!(f, "invalid interval: {e}"),
+        }
+    }
+}
+
+impl std::error::Error for IntervalParseError {}
 
 impl FromStr for Interval {
     type Err = IntervalParseError;

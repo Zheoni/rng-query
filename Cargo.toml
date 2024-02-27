@@ -1,7 +1,7 @@
 [package]
 name = "rng-query"
 description = "CLI to use pseudorandomness the easy way"
-version = "2.0.0"
+version = "2.0.1"
 edition = "2021"
 authors = ["Zheoni <zheoni@outlook.es>"]
 license = "MIT"
@@ -10,24 +10,25 @@ categories = ["command-line-utilities"]
 repository = "https://github.com/Zheoni/rng-query"
 readme = "README.md"
 
-
 [dependencies]
 rand = "0.8.5"
 rand_pcg = "0.3.1"
 regex = "1.10.3"
-thiserror = "1.0.47"
 owo-colors = "4.0.0"
-anstream = "0.6.12"
 # bin
-clap = { version = "4.5.1", features = ["derive"], optional = true }
-colorchoice-clap = { version = "1.0.3", optional = true }
+clap = { version = "4.5.1", features = ["cargo"], optional = true }
+anstream = { version = "0.6.12", optional = true }
 
 [dev-dependencies]
 test-case = "3.1.0"
 
 [features]
 default = ["bin"]
-bin = ["dep:clap", "dep:colorchoice-clap"]
+bin = ["dep:clap", "dep:anstream"]
+
+[profile.release]
+debug = "none"
+strip = true
 
 [[bin]]
 name = "rq"

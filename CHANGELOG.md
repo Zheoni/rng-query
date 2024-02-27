@@ -2,6 +2,11 @@
 
 ## Unreleased - ReleaseDate
 
+## 2.0.1 - 2023-02-27
+
+Internal improvements and CLI args renames. Old arg names are still supported
+but hidden and may be removed or repurposed in a future release.
+
 ## 2.0.0 - 2023-02-27
 
 This release focuses on simplify things while keeping the core functionality.

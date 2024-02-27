@@ -52,13 +52,22 @@ enum SelectWhich {
 }
 
 /// Error from [`Roll::from_str`]
-#[derive(Debug, thiserror::Error)]
+#[derive(Debug)]
 pub enum RollParseError {
-    #[error("the input is not a dice roll")]
     NoMatch,
-    #[error("invalid dice roll: {0}")]
     Invalid(String),
 }
+
+impl std::fmt::Display for RollParseError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            RollParseError::NoMatch => f.write_str("the input is not a dice roll"),
+            RollParseError::Invalid(e) => write!(f, "invalid dice roll: {e}"),
+        }
+    }
+}
+
+impl std::error::Error for RollParseError {}
 
 impl FromStr for Roll {
     type Err = RollParseError;

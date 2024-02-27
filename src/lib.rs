@@ -113,15 +113,24 @@ impl State {
 }
 
 /// Query error
-#[derive(Debug, thiserror::Error)]
+#[derive(Debug)]
 pub enum Error {
     /// Parsing options
-    #[error("options: {0}")]
     Options(String),
     /// Parsing expressions
-    #[error("expression: {0}")]
     Expr(String),
     /// Query structure error
-    #[error("parsing query structure: {0}")]
     ParseQuery(String),
 }
+
+impl std::fmt::Display for Error {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Error::Options(e) => write!(f, "options: {e}"),
+            Error::Expr(e) => write!(f, "expresions: {e}"),
+            Error::ParseQuery(e) => write!(f, "query structure: {e}"),
+        }
+    }
+}
+
+impl std::error::Error for Error {}
