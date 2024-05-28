@@ -4,6 +4,7 @@ use owo_colors::OwoColorize;
 use rand::Rng;
 
 use crate::eval::Eval;
+use crate::eval::EvalRes;
 use crate::eval::Sample;
 use crate::regex;
 use crate::Pcg;
@@ -215,7 +216,7 @@ struct Die {
 }
 
 impl Eval for Roll {
-    fn eval(&self, rng: &mut Pcg) -> Vec<Sample> {
+    fn eval(&self, rng: &mut Pcg) -> EvalRes {
         let mut dice = Vec::new();
 
         for _ in 0..self.amount {
@@ -248,7 +249,7 @@ impl Eval for Roll {
             }
         }
 
-        vec![Sample::expr(Box::new(RollSample { roll: *self, dice }))]
+        Sample::expr(Box::new(RollSample { roll: *self, dice })).into()
     }
 }
 

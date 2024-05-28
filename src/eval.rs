@@ -40,48 +40,70 @@ impl std::fmt::Display for Sample {
     }
 }
 
-pub trait Eval {
-    fn eval(&self, rng: &mut Pcg) -> Vec<Sample>;
+pub(crate) enum EvalRes {
+    Emtpy,
+    Single(Sample),
+    Many(Vec<Sample>),
 }
 
-impl<T> Eval for T
+impl From<Sample> for EvalRes {
+    fn from(value: Sample) -> Self {
+        Self::Single(value)
+    }
+}
+
+impl From<Vec<Sample>> for EvalRes {
+    fn from(value: Vec<Sample>) -> Self {
+        Self::Many(value)
+    }
+}
+
+pub(crate) trait Eval {
+    fn eval(&self, rng: &mut Pcg) -> EvalRes;
+}
+
+impl<T, R> Eval for T
 where
-    T: Fn(&mut Pcg) -> Vec<Sample>,
+    T: Fn(&mut Pcg) -> R,
+    R: Into<EvalRes>,
 {
-    fn eval(&self, rng: &mut Pcg) -> Vec<Sample> {
-        (self)(rng)
+    fn eval(&self, rng: &mut Pcg) -> EvalRes {
+        (self)(rng).into()
     }
 }
 
 impl Eval for Query {
-    fn eval(&self, rng: &mut Pcg) -> Vec<Sample> {
+    fn eval(&self, rng: &mut Pcg) -> EvalRes {
         self.root.eval(rng)
     }
 }
 
 impl Eval for Choose {
-    fn eval(&self, rng: &mut Pcg) -> Vec<Sample> {
+    fn eval(&self, rng: &mut Pcg) -> EvalRes {
         let Self { entries, options } = self;
 
         let selected = select(rng, entries, options);
 
         if selected.is_empty() {
-            return vec![];
+            return EvalRes::Emtpy;
         }
 
-        let mut it = selected.into_iter();
-        let mut output = it.next().unwrap().1.eval(rng);
-        for (_, entry) in it {
-            output.append(&mut entry.eval(rng));
+        let mut v = Vec::with_capacity(selected.len());
+        for (_, entry) in selected {
+            match entry.eval(rng) {
+                EvalRes::Emtpy => {}
+                EvalRes::Single(s) => v.push(s),
+                EvalRes::Many(mut vv) => v.append(&mut vv),
+            }
         }
-        output
+        EvalRes::Many(v)
     }
 }
 
 impl Eval for Entry {
-    fn eval(&self, rng: &mut Pcg) -> Vec<Sample> {
+    fn eval(&self, rng: &mut Pcg) -> EvalRes {
         match self {
-            Entry::Text(t) => vec![Sample::text(t.clone())],
+            Entry::Text(t) => Sample::text(t.clone()).into(),
             Entry::Expr(e) => e.eval(rng),
         }
     }

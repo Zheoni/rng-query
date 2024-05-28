@@ -11,7 +11,7 @@ struct Query<'a> {
 #[derive(Debug)]
 enum Entry<'a> {
     Query(Box<Query<'a>>),
-    Entry(&'a str),
+    Text(&'a str),
 }
 
 struct Cursor<'a> {
@@ -77,7 +77,7 @@ fn parse_query_rec<'a>(cursor: &mut Cursor<'a>, is_root: bool) -> Result<Query<'
             s = &s[..s.len() - 1]; // this may be a problem with utf8 codepoints
         }
         s = s.trim();
-        Entry::Entry(s)
+        Entry::Text(s)
     }
 
     let mut end_found = false;
@@ -138,7 +138,7 @@ fn parse_query_rec<'a>(cursor: &mut Cursor<'a>, is_root: bool) -> Result<Query<'
         entries.push(take_entry(cursor, false));
     }
     entries.retain(|e| {
-        if let Entry::Entry(s) = e {
+        if let Entry::Text(s) = e {
             !s.is_empty()
         } else {
             true
@@ -172,7 +172,7 @@ fn ast_choose(q: &Query) -> Result<ast::Choose, Error> {
 fn ast_entry(entry: &Entry, always_text: bool) -> Result<ast::Entry, Error> {
     let e = match entry {
         Entry::Query(q) => ast::Entry::Expr(Rc::new(ast_choose(q)?)),
-        Entry::Entry(e) => {
+        Entry::Text(e) => {
             if always_text {
                 ast::Entry::data(e)
             } else {

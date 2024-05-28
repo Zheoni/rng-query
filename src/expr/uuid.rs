@@ -2,7 +2,7 @@ use rand::Rng;
 
 use crate::{Pcg, Sample};
 
-pub fn gen_uuid(rng: &mut Pcg) -> Vec<Sample> {
+pub fn gen_uuid(rng: &mut Pcg) -> Sample {
     // https://datatracker.ietf.org/doc/html/rfc9562#section-5.4
     let mut uuid: [u8; 16] = rng.gen();
     uuid[6] = (uuid[6] & 0x0f) | 0x40; // version (byte 6 to hex 4x -> 0x40)
@@ -13,7 +13,7 @@ pub fn gen_uuid(rng: &mut Pcg) -> Vec<Sample> {
         // SAFETY: only ASCII used
         std::str::from_utf8_unchecked(&bytes)
     };
-    vec![Sample::text(s.into())]
+    Sample::text(s.into())
 }
 
 const HEX: [u8; 16] = [

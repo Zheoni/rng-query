@@ -91,7 +91,12 @@ impl State {
             ast.root.entries = entries;
         }
         let res = ast.eval(&mut self.rng);
-        Ok(res)
+        let v = match res {
+            eval::EvalRes::Emtpy => vec![],
+            eval::EvalRes::Single(s) => vec![s],
+            eval::EvalRes::Many(v) => v,
+        };
+        Ok(v)
     }
 
     fn push_entry(&mut self, entry: Entry) {

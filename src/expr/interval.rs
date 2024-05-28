@@ -11,8 +11,11 @@ use rand::{
     Rng,
 };
 
-use crate::{eval::Eval, regex};
 use crate::{eval::Sample, Pcg};
+use crate::{
+    eval::{Eval, EvalRes},
+    regex,
+};
 
 /// Int type used in the interval
 pub type Int = i32;
@@ -206,7 +209,7 @@ enum Num {
 }
 
 impl Eval for Interval {
-    fn eval(&self, rng: &mut Pcg) -> Vec<Sample> {
+    fn eval(&self, rng: &mut Pcg) -> EvalRes {
         let Interval {
             low_inc,
             high_inc,
@@ -232,10 +235,11 @@ impl Eval for Interval {
                 Num::Float(f)
             }
         };
-        vec![Sample::expr(Box::new(IntervalSample {
+        Sample::expr(Box::new(IntervalSample {
             value,
             interval: self.clone(),
-        }))]
+        }))
+        .into()
     }
 }
 
