@@ -3,6 +3,7 @@
 ## Unreleased - ReleaseDate
 
 - Add `t` flag to treat entries as _text_.
+- Add random color generation.
 
 ## 2.0.1 - 2023-02-27
 
