@@ -6,12 +6,14 @@ mod coin;
 mod color;
 mod dice;
 mod interval;
+mod uuid;
 
 pub fn parse_expr(expr: &str) -> Result<Option<Rc<dyn Eval>>, Error> {
     // one word specials
     let thing: Option<Rc<dyn Eval>> = match expr {
         "coin" => Some(Rc::new(coin::toss_coin)),
         "color" => Some(Rc::new(color::gen_color)),
+        "uuid" => Some(Rc::new(uuid::gen_uuid)),
         _ => None,
     };
     if thing.is_some() {
