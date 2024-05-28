@@ -2,6 +2,8 @@
 
 ## Unreleased - ReleaseDate
 
+- Add `t` flag to treat entries as _text_.
+
 ## 2.0.1 - 2023-02-27
 
 Internal improvements and CLI args renames. Old arg names are still supported

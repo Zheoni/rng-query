@@ -18,6 +18,7 @@ pub struct ChooseOptions {
     pub repeating: bool,
     pub keep_order: bool,
     pub amount: Amount,
+    pub text: bool,
 }
 
 impl Default for ChooseOptions {
@@ -26,6 +27,7 @@ impl Default for ChooseOptions {
             repeating: false,
             keep_order: false,
             amount: Amount::N(1),
+            text: false,
         }
     }
 }
@@ -34,6 +36,7 @@ impl ChooseOptions {
     pub fn shuffle() -> Self {
         ChooseOptions {
             amount: Amount::All,
+            text: true,
             ..Default::default()
         }
     }
@@ -41,6 +44,7 @@ impl ChooseOptions {
         ChooseOptions {
             amount: Amount::All,
             keep_order: true,
+            text: true,
             ..Default::default()
         }
     }

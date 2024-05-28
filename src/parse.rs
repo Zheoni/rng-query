@@ -154,25 +154,31 @@ fn build_ast(q: &Query) -> Result<ast::Query, Error> {
 }
 
 fn ast_choose(q: &Query) -> Result<ast::Choose, Error> {
-    let mut entries = Vec::with_capacity(q.entries.len());
-    for (id, entry) in q.entries.iter().enumerate() {
-        let e = ast_entry(entry)?;
-        entries.push((id, e));
-    }
-
     let options = if let Some(options) = q.options {
         ast_options(options)?
     } else {
         ast::ChooseOptions::default()
     };
 
+    let mut entries = Vec::with_capacity(q.entries.len());
+    for (id, entry) in q.entries.iter().enumerate() {
+        let e = ast_entry(entry, options.text)?;
+        entries.push((id, e));
+    }
+
     Ok(ast::Choose { entries, options })
 }
 
-fn ast_entry(entry: &Entry) -> Result<ast::Entry, Error> {
+fn ast_entry(entry: &Entry, always_text: bool) -> Result<ast::Entry, Error> {
     let e = match entry {
         Entry::Query(q) => ast::Entry::Expr(Rc::new(ast_choose(q)?)),
-        Entry::Entry(e) => ast::Entry::parse(e)?,
+        Entry::Entry(e) => {
+            if always_text {
+                ast::Entry::data(e)
+            } else {
+                ast::Entry::parse(e)?
+            }
+        }
     };
     Ok(e)
 }
@@ -184,7 +190,7 @@ fn ast_options(s: &str) -> Result<ast::ChooseOptions, Error> {
         _ => {}
     };
 
-    let re = regex!(r"\A(all\b|(?:[0-9]+))?([ ro]*)\z");
+    let re = regex!(r"\A(all\b|(?:[0-9]+))?([ rot]*)\z");
     let cap = re
         .captures(s)
         .ok_or_else(|| Error::Options(format!("Bad options: {s:?}")))?;
@@ -213,11 +219,13 @@ fn ast_options(s: &str) -> Result<ast::ChooseOptions, Error> {
     }
     let repeating = flags.contains(&'r');
     let keep_order = flags.contains(&'o');
+    let text = flags.contains(&'t');
 
     Ok(ast::ChooseOptions {
         amount,
         repeating,
         keep_order,
+        text,
     })
 }
 
