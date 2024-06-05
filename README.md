@@ -152,6 +152,14 @@ think more modifiers can be useful, submit an issue.
 Toss a coin. Simple, just write `coin`. At the end it's equivalent to a subquery
 like `{ heads, tails }`.
 
+#### Color
+
+Generate a random RGB color. The keyword is `color`.
+
+#### UUID
+
+Generate a random UUID (v4). The keyword is `uuid`.
+
 ## Notes on pseudorandomness
 
 Currently, randomness should be statistically valid, but NOT cryptographically
